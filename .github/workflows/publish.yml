@@ -75,6 +75,7 @@ jobs:
 
     - name: Run Flyway migration with Docker
       run: |
+        echo "Starting Flyway migration with Docker..."
         docker run --rm --network host \
           -v ${{ github.workspace }}/persistence-module/src/main/resources/db/migration:/flyway/sql \
           -e FLYWAY_URL="jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC" \
@@ -82,6 +83,12 @@ jobs:
           -e FLYWAY_PASSWORD=dbpassword \
           -e FLYWAY_SCHEMAS=mydb \
           flyway/flyway:10.10.0 migrate
+        echo "Flyway migration completed successfully!"
+        
+    - name: Verify migration results
+      run: |
+        echo "Checking migration results..."
+        mysql -h"127.0.0.1" -P"3306" -u"dbuser" -p"dbpassword" mydb -e "SHOW TABLES;"
 
     - name: Build persistence module (skip Flyway)
       run: ./gradlew :persistence-module:build -x flywayMigrate
@@ -91,7 +98,7 @@ jobs:
         ORG_GRADLE_PROJECT_db_password: dbpassword
 
     - name: Publish to GitHub Packages
-      run: ./gradlew :persistence-module:publish
+      run: ./gradlew :persistence-module:publish -x flywayMigrate
       env:
         USERNAME: ${{ github.actor }}
         TOKEN: ${{ secrets.GITHUB_TOKEN }}
