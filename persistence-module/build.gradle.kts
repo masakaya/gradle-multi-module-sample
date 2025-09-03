@@ -44,8 +44,9 @@ dependencies {
     api(Libs.Database.flywayMysql)
     api(Libs.Kotlin.reflect)
     
-    // MySQL driver needs to be available at compile time for Flyway
+    // MySQL driver needs to be available at multiple classpaths for Flyway and jOOQ
     implementation(Libs.Database.mysqlConnector)
+    runtimeOnly(Libs.Database.mysqlConnector)  // For Flyway runtime
     jooqGenerator(Libs.Database.mysqlConnector)
     jooqGenerator(Libs.Jooq.codegen)
     
@@ -120,6 +121,7 @@ flyway {
     url = dbUrl
     user = dbUser
     password = dbPassword
+    driver = "com.mysql.cj.jdbc.Driver"  // Explicitly specify the MySQL driver
     schemas = arrayOf("mydb")
     locations = arrayOf("filesystem:src/main/resources/db/migration")
     cleanDisabled = false
@@ -150,7 +152,7 @@ tasks.named("flywayMigrate") {
         println("java.class.path contains mysql: ${System.getProperty("java.class.path").contains("mysql")}")
         
         println("=== End Debug Info ===")
-    }
+
 }
 
 tasks.named("generateJooq").configure {
