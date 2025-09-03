@@ -212,7 +212,7 @@ publishing {
             pom {
                 name.set("Infrastructure Persistence Module")
                 description.set("Shared persistence layer for database operations")
-                url.set("https://github.com/masakaya/gradle-shard-module-sample")
+                url.set("https://github.com/masakaya/gradle-multi-module-sample")
                 
                 licenses {
                     license {
@@ -230,9 +230,9 @@ publishing {
                 }
                 
                 scm {
-                    connection.set("scm:git:git://github.com/masakaya/gradle-shard-module-sample.git")
-                    developerConnection.set("scm:git:ssh://github.com/masakaya/gradle-shard-module-sample.git")
-                    url.set("https://github.com/masakaya/gradle-shard-module-sample")
+                    connection.set("scm:git:git://github.com/masakaya/gradle-multi-module-sample.git")
+                    developerConnection.set("scm:git:ssh://github.com/masakaya/gradle-multi-module-sample.git")
+                    url.set("https://github.com/masakaya/gradle-multi-module-sample")
                 }
             }
         }
@@ -241,7 +241,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/masakaya/gradle-shard-module-sample")
+            url = uri("https://maven.pkg.github.com/masakaya/gradle-multi-module-sample")
             credentials {
                 username = project.findProperty("gpr.user") as String? ?: System.getenv("USERNAME")
                 password = project.findProperty("gpr.key") as String? ?: System.getenv("TOKEN")
