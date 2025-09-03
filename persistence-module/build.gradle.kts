@@ -128,7 +128,28 @@ flyway {
 // Configure Flyway tasks to ensure MySQL driver is available
 tasks.named("flywayMigrate") {
     doFirst {
-        println("Flyway migrate using: $dbUrl")
+        println("=== Flyway Migration Debug Info ===")
+        println("Database URL: $dbUrl")
+        println("Database User: $dbUser") 
+        println("Database Password: ${if (dbPassword.isNotEmpty()) "***SET***" else "***EMPTY***"}")
+        println("Flyway schemas: ${flyway.schemas.joinToString(", ")}")
+        println("Flyway locations: ${flyway.locations.joinToString(", ")}")
+        
+        // Check buildscript classpath
+        println("=== Buildscript Classpath Info ===")
+        try {
+            val mysqlDriverClass = Class.forName("com.mysql.cj.jdbc.Driver")
+            println("MySQL Driver found in classpath: ${mysqlDriverClass.canonicalName}")
+        } catch (e: ClassNotFoundException) {
+            println("ERROR: MySQL Driver NOT found in classpath!")
+            println("ClassNotFoundException: ${e.message}")
+        }
+        
+        // Print system properties
+        println("=== Java System Properties ===")
+        println("java.class.path contains mysql: ${System.getProperty("java.class.path").contains("mysql")}")
+        
+        println("=== End Debug Info ===")
     }
 }
 
