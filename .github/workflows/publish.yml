@@ -73,12 +73,30 @@ jobs:
         }
         echo "MySQL and user setup complete!"
 
-    - name: Run Flyway migration
-      run: ./gradlew :persistence-module:flywayMigrate
+    - name: Download Flyway CLI
+      run: |
+        wget -qO- https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/10.10.0/flyway-commandline-10.10.0-linux-x64.tar.gz | tar xvz
+        sudo cp flyway-10.10.0/flyway /usr/local/bin/
+        sudo chmod +x /usr/local/bin/flyway
+
+    - name: Download MySQL Connector
+      run: |
+        wget -O mysql-connector.jar https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar
+
+    - name: Run Flyway migration with CLI
+      run: |
+        flyway \
+          -url=jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC \
+          -user=dbuser \
+          -password=dbpassword \
+          -schemas=mydb \
+          -locations=filesystem:persistence-module/src/main/resources/db/migration \
+          -classpath=mysql-connector.jar \
+          migrate
       env:
-        ORG_GRADLE_PROJECT_db_url: jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-        ORG_GRADLE_PROJECT_db_user: dbuser
-        ORG_GRADLE_PROJECT_db_password: dbpassword
+        FLYWAY_URL: jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+        FLYWAY_USER: dbuser
+        FLYWAY_PASSWORD: dbpassword
 
     - name: Build persistence module (skip Flyway)
       run: ./gradlew :persistence-module:build -x flywayMigrate
