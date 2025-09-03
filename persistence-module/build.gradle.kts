@@ -49,10 +49,6 @@ dependencies {
     implementation(Libs.Database.mysqlConnector)
     runtimeOnly(Libs.Database.mysqlConnector)  // For Flyway runtime
     
-    // Special Flyway classpath configuration
-    add("flywayClasspath", Libs.Database.mysqlConnector)
-    add("flywayClasspath", Libs.Database.flywayMysql)
-    
     jooqGenerator(Libs.Database.mysqlConnector)
     jooqGenerator(Libs.Jooq.codegen)
     
@@ -162,7 +158,10 @@ tasks.named("flywayMigrate") {
 }
 
 tasks.named("generateJooq").configure {
-    dependsOn("flywayMigrate")
+    // Only depend on flywayMigrate when not excluded
+    if (project.gradle.startParameter.excludedTaskNames.none { it.contains("flywayMigrate") }) {
+        dependsOn("flywayMigrate")
+    }
     inputs.dir("src/main/resources/db/migration")
     outputs.dir("build/generated-src/jooq")
     

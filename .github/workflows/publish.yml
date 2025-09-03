@@ -73,8 +73,15 @@ jobs:
         }
         echo "MySQL and user setup complete!"
 
-    - name: Build persistence module
-      run: ./gradlew :persistence-module:build
+    - name: Run Flyway migration
+      run: ./gradlew :persistence-module:flywayMigrate
+      env:
+        ORG_GRADLE_PROJECT_db_url: jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+        ORG_GRADLE_PROJECT_db_user: dbuser
+        ORG_GRADLE_PROJECT_db_password: dbpassword
+
+    - name: Build persistence module (skip Flyway)
+      run: ./gradlew :persistence-module:build -x flywayMigrate
       env:
         ORG_GRADLE_PROJECT_db_url: jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
         ORG_GRADLE_PROJECT_db_user: dbuser
