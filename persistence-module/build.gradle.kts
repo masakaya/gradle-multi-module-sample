@@ -59,23 +59,15 @@ kotlin {
 }
 
 // Database connection configuration (for jOOQ code generation)
-val dbUrl = project.findProperty("db.url") as String? 
-    ?: System.getenv("ORG_GRADLE_PROJECT_db_url") 
+val dbUrl = System.getenv("ORG_GRADLE_PROJECT_db_url") 
+    ?: project.findProperty("db.url") as String?
     ?: "jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
-val dbUser = project.findProperty("db.user") as String? 
-    ?: System.getenv("ORG_GRADLE_PROJECT_db_user") 
+val dbUser = System.getenv("ORG_GRADLE_PROJECT_db_user")
+    ?: project.findProperty("db.user") as String?
     ?: "dbuser"
-val dbPassword = project.findProperty("db.password") as String? 
-    ?: System.getenv("ORG_GRADLE_PROJECT_db_password") 
+val dbPassword = System.getenv("ORG_GRADLE_PROJECT_db_password")
+    ?: project.findProperty("db.password") as String?
     ?: "dbpassword"
-
-// Debug logging for database configuration
-println("=== Database Configuration ===")
-println("dbUrl: $dbUrl")
-println("dbUser: $dbUser")
-println("Environment ORG_GRADLE_PROJECT_db_url: ${System.getenv("ORG_GRADLE_PROJECT_db_url")}")
-println("Project property db.url: ${project.findProperty("db.url")}")
-println("==============================")
 
 // jOOQ configuration
 jooq {
