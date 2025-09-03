@@ -44,7 +44,8 @@ dependencies {
     api(Libs.Database.flywayMysql)
     api(Libs.Kotlin.reflect)
     
-    runtimeOnly(Libs.Database.mysqlConnector)
+    // MySQL driver needs to be available at compile time for Flyway
+    implementation(Libs.Database.mysqlConnector)
     jooqGenerator(Libs.Database.mysqlConnector)
     jooqGenerator(Libs.Jooq.codegen)
     
@@ -122,6 +123,11 @@ flyway {
     schemas = arrayOf("mydb")
     locations = arrayOf("filesystem:src/main/resources/db/migration")
     cleanDisabled = false
+}
+
+// Configure Flyway tasks to use MySQL driver
+tasks.withType<org.flywaydb.gradle.task.AbstractFlywayTask>().configureEach {
+    dependsOn(configurations.runtimeClasspath)
 }
 
 tasks.named("generateJooq").configure {
