@@ -5,11 +5,14 @@ buildscript {
         gradlePluginPortal()
     }
     dependencies {
-        classpath(Libs.Database.mysqlConnector)
-        classpath(Libs.Database.flywayMysql)
         classpath("nu.studer:gradle-jooq-plugin:10.1.1")
+        // Move Flyway dependencies here for better classpath resolution
+        classpath("org.flywaydb:flyway-core:${Versions.flyway}")
+        classpath("org.flywaydb:flyway-mysql:${Versions.flyway}")
+        classpath("com.mysql:mysql-connector-j:${Versions.mysqlConnector}")
     }
 }
+
 
 plugins {
     java
@@ -43,7 +46,10 @@ dependencies {
     api(Libs.Database.flywayMysql)
     api(Libs.Kotlin.reflect)
     
-    runtimeOnly(Libs.Database.mysqlConnector)
+    // MySQL driver needs to be available at multiple classpaths for Flyway and jOOQ
+    implementation(Libs.Database.mysqlConnector)
+    runtimeOnly(Libs.Database.mysqlConnector)  // For Flyway runtime
+    
     jooqGenerator(Libs.Database.mysqlConnector)
     jooqGenerator(Libs.Jooq.codegen)
     
@@ -58,9 +64,15 @@ kotlin {
 }
 
 // Database connection configuration (for jOOQ code generation)
-val dbUrl = project.findProperty("db.url") as String? ?: "jdbc:mysql://localhost:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
-val dbUser = project.findProperty("db.user") as String? ?: "dbuser"
-val dbPassword = project.findProperty("db.password") as String? ?: "dbpassword"
+val dbUrl = System.getenv("ORG_GRADLE_PROJECT_db_url") 
+    ?: project.findProperty("db.url") as String?
+    ?: "jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+val dbUser = System.getenv("ORG_GRADLE_PROJECT_db_user")
+    ?: project.findProperty("db.user") as String?
+    ?: "dbuser"
+val dbPassword = System.getenv("ORG_GRADLE_PROJECT_db_password")
+    ?: project.findProperty("db.password") as String?
+    ?: "dbpassword"
 
 // jOOQ configuration
 jooq {
@@ -112,12 +124,71 @@ flyway {
     url = dbUrl
     user = dbUser
     password = dbPassword
+    driver = "com.mysql.cj.jdbc.Driver"  // Explicitly specify the MySQL driver
     schemas = arrayOf("mydb")
     locations = arrayOf("filesystem:src/main/resources/db/migration")
     cleanDisabled = false
 }
 
+// Alternative Flyway migration using JavaExec 
+tasks.register<JavaExec>("runFlywayMigrate") {
+    group = "flyway"
+    description = "Run Flyway migration using JavaExec with proper classpath"
+    
+    classpath = buildscript.configurations["classpath"] + configurations.runtimeClasspath.get()
+    mainClass.set("org.flywaydb.commandline.Main")
+    
+    args(
+        "-url=$dbUrl",
+        "-user=$dbUser",
+        "-password=$dbPassword",
+        "-schemas=mydb",
+        "-locations=filesystem:src/main/resources/db/migration",
+        "migrate"
+    )
+    
+    doFirst {
+        println("=== Alternative Flyway Migration ===")
+        println("Using JavaExec with combined classpath")
+        println("URL: $dbUrl")
+        println("User: $dbUser")
+        println("Locations: src/main/resources/db/migration")
+    }
+}
+
+// Configure Flyway tasks to ensure MySQL driver is available
+tasks.named("flywayMigrate") {
+    doFirst {
+        println("=== Flyway Migration Debug Info ===")
+        println("Database URL: $dbUrl")
+        println("Database User: $dbUser") 
+        println("Database Password: ${if (dbPassword.isNotEmpty()) "***SET***" else "***EMPTY***"}")
+        println("Flyway schemas: ${flyway.schemas.joinToString(", ")}")
+        println("Flyway locations: ${flyway.locations.joinToString(", ")}")
+        
+        // Check buildscript classpath
+        println("=== Buildscript Classpath Info ===")
+        try {
+            val mysqlDriverClass = Class.forName("com.mysql.cj.jdbc.Driver")
+            println("MySQL Driver found in classpath: ${mysqlDriverClass.canonicalName}")
+        } catch (e: ClassNotFoundException) {
+            println("ERROR: MySQL Driver NOT found in classpath!")
+            println("ClassNotFoundException: ${e.message}")
+        }
+        
+        // Print system properties
+        println("=== Java System Properties ===")
+        println("java.class.path contains mysql: ${System.getProperty("java.class.path").contains("mysql")}")
+        
+        println("=== End Debug Info ===")
+    }
+}
+
 tasks.named("generateJooq").configure {
+    // Only depend on flywayMigrate when not excluded
+    if (project.gradle.startParameter.excludedTaskNames.none { it.contains("flywayMigrate") }) {
+        dependsOn("flywayMigrate")
+    }
     inputs.dir("src/main/resources/db/migration")
     outputs.dir("build/generated-src/jooq")
     
@@ -125,6 +196,11 @@ tasks.named("generateJooq").configure {
         println("Generating jOOQ classes from database schema...")
         println("Make sure the database is running and migrations are applied!")
     }
+}
+
+// Ensure compileKotlin runs after jOOQ code generation
+tasks.named("compileKotlin").configure {
+    dependsOn("generateJooq")
 }
 
 // GitHub Packages publishing configuration
@@ -136,7 +212,7 @@ publishing {
             pom {
                 name.set("Infrastructure Persistence Module")
                 description.set("Shared persistence layer for database operations")
-                url.set("https://github.com/masakaya/gradle-shard-module-sample")
+                url.set("https://github.com/masakaya/gradle-multi-module-sample")
                 
                 licenses {
                     license {
@@ -154,9 +230,9 @@ publishing {
                 }
                 
                 scm {
-                    connection.set("scm:git:git://github.com/masakaya/gradle-shard-module-sample.git")
-                    developerConnection.set("scm:git:ssh://github.com/masakaya/gradle-shard-module-sample.git")
-                    url.set("https://github.com/masakaya/gradle-shard-module-sample")
+                    connection.set("scm:git:git://github.com/masakaya/gradle-multi-module-sample.git")
+                    developerConnection.set("scm:git:ssh://github.com/masakaya/gradle-multi-module-sample.git")
+                    url.set("https://github.com/masakaya/gradle-multi-module-sample")
                 }
             }
         }
@@ -165,7 +241,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/masakaya/gradle-shard-module-sample")
+            url = uri("https://maven.pkg.github.com/masakaya/gradle-multi-module-sample")
             credentials {
                 username = project.findProperty("gpr.user") as String? ?: System.getenv("USERNAME")
                 password = project.findProperty("gpr.key") as String? ?: System.getenv("TOKEN")

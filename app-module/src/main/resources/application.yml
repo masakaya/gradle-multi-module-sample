@@ -22,6 +22,7 @@ spring:
   # Flyway設定
   flyway:
     validate-on-migrate: false
+    baseline-on-migrate: true
     
   # 国際化設定（MessageConfigで設定）
   

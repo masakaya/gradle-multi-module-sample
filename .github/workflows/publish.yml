@@ -19,15 +19,13 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: rootpassword
           MYSQL_DATABASE: mydb
-          MYSQL_USER: dbuser
-          MYSQL_PASSWORD: dbpassword
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping"
+          --health-cmd="mysqladmin ping -h localhost -u root -prootpassword"
           --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+          --health-timeout=10s
+          --health-retries=10
 
     steps:
     - uses: actions/checkout@v4
@@ -41,30 +39,66 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Wait for MySQL
+    - name: Install MySQL Client
       run: |
-        until mysqladmin ping -h"127.0.0.1" -P"3306" --silent; do
-          echo 'Waiting for MySQL...'
-          sleep 1
+        sudo apt-get update
+        sudo apt-get install -y mysql-client-8.0
+
+    - name: Wait for MySQL and create user
+      run: |
+        echo "Waiting for MySQL service to be ready..."
+        for i in {1..30}; do
+          if mysqladmin ping -h"127.0.0.1" -P"3306" -u"root" -p"rootpassword" --silent; then
+            echo "MySQL is ready!"
+            break
+          else
+            echo "Attempt $i/30: MySQL not ready yet, waiting 5 seconds..."
+            sleep 5
+          fi
         done
-        echo "MySQL is ready!"
+        
+        # Create database user
+        echo "Creating database user..."
+        mysql -h"127.0.0.1" -P"3306" -u"root" -p"rootpassword" -e "
+          CREATE USER IF NOT EXISTS 'dbuser'@'%' IDENTIFIED BY 'dbpassword';
+          GRANT ALL PRIVILEGES ON mydb.* TO 'dbuser'@'%';
+          FLUSH PRIVILEGES;
+        "
+        
+        # Verify user connection
+        echo "Testing user connection..."
+        mysqladmin ping -h"127.0.0.1" -P"3306" -u"dbuser" -p"dbpassword" --silent || {
+          echo "ERROR: Could not connect to MySQL with dbuser"
+          exit 1
+        }
+        echo "MySQL and user setup complete!"
 
-    - name: Run database migrations
-      run: ./gradlew :persistence-module:flywayMigrate
-      env:
-        ORG_GRADLE_PROJECT_db_url: jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-        ORG_GRADLE_PROJECT_db_user: dbuser
-        ORG_GRADLE_PROJECT_db_password: dbpassword
+    - name: Run Flyway migration with Docker
+      run: |
+        echo "Starting Flyway migration with Docker..."
+        docker run --rm --network host \
+          -v ${{ github.workspace }}/persistence-module/src/main/resources/db/migration:/flyway/sql \
+          -e FLYWAY_URL="jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC" \
+          -e FLYWAY_USER=dbuser \
+          -e FLYWAY_PASSWORD=dbpassword \
+          -e FLYWAY_SCHEMAS=mydb \
+          flyway/flyway:10.10.0 migrate
+        echo "Flyway migration completed successfully!"
+        
+    - name: Verify migration results
+      run: |
+        echo "Checking migration results..."
+        mysql -h"127.0.0.1" -P"3306" -u"dbuser" -p"dbpassword" mydb -e "SHOW TABLES;"
 
-    - name: Build persistence module
-      run: ./gradlew :persistence-module:build
+    - name: Build persistence module (skip Flyway)
+      run: ./gradlew :persistence-module:build -x flywayMigrate
       env:
         ORG_GRADLE_PROJECT_db_url: jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
         ORG_GRADLE_PROJECT_db_user: dbuser
         ORG_GRADLE_PROJECT_db_password: dbpassword
 
     - name: Publish to GitHub Packages
-      run: ./gradlew :persistence-module:publish
+      run: ./gradlew :persistence-module:publish -x flywayMigrate
       env:
         USERNAME: ${{ github.actor }}
         TOKEN: ${{ secrets.GITHUB_TOKEN }}
