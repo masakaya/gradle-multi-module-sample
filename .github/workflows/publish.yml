@@ -24,7 +24,7 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping"
+          --health-cmd="mysqladmin ping -h localhost"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -40,6 +40,11 @@ jobs:
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
+
+    - name: Install MySQL Client
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mysql-client-core-8.0
 
     - name: Wait for MySQL
       run: |
