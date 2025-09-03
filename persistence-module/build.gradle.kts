@@ -125,9 +125,12 @@ flyway {
     cleanDisabled = false
 }
 
-// Configure Flyway tasks to use MySQL driver
-tasks.withType<org.flywaydb.gradle.task.AbstractFlywayTask>().configureEach {
-    dependsOn(configurations.runtimeClasspath)
+// Configure Flyway tasks to ensure MySQL driver is available
+tasks.named("flywayMigrate") {
+    dependsOn("classes")
+    doFirst {
+        println("Flyway migrate using: $dbUrl")
+    }
 }
 
 tasks.named("generateJooq").configure {
