@@ -25,38 +25,37 @@ Spring Boot + Flyway + jOOQ + MySQLを使用したサンプルプロジェクト
 
 ```
 .
-├── build.gradle.kts                    # ビルド設定
-├── docker-compose.yml                 # MySQL環境
-├── src/main/
-│   ├── kotlin/com/masakaya/
-│   │   ├── Application.kt              # Spring Bootメインクラス
-│   │   ├── service/                    # Service Layer
-│   │   │   ├── CompanyService.kt       #   ビジネスロジック
-│   │   │   └── repository/             #   リポジトリインターフェース
-│   │   │       └── CompanyRepository.kt
-│   │   └── infrastructure/             # Infrastructure Layer
-│   │       └── persistence/            #   データアクセス実装
-│   │           └── CompanyRepositoryImpl.kt
+├── build.gradle.kts                    # ルートビルド設定
+├── settings.gradle.kts                 # マルチモジュール設定
+├── docker-compose.yml                  # MySQL環境
+├── gradle.properties                   # Gradle設定
+│
+├── persistence-module/                 # 永続化層モジュール
+│   ├── infrastructure/                 # インフラストラクチャ層
+│   ├── repository/                     # リポジトリインターフェース
 │   └── resources/
-│       ├── application.yml             # 環境別設定
 │       ├── db/migration/               # Flywayマイグレーション
-│       │   ├── V1__create_companies_table.sql
-│       │   ├── V2__create_teams_table.sql
-│       │   └── V3__create_users_table.sql
 │       └── db/seed/                    # テストデータ
-│           ├── R__01_insert_test_companies.sql
-│           ├── R__02_insert_test_teams.sql
-│           └── R__03_insert_test_users.sql
-└── build/generated-src/jooq/           # jOOQ自動生成クラス
-    └── main/com/masakaya/jooq/generated/
-        ├── tables/                     # テーブル定義
-        │   ├── Companies.kt
-        │   ├── Users.kt
-        │   ├── Teams.kt
-        │   ├── records/                # Recordクラス
-        │   └── pojos/                  # POJOクラス
-        └── Mydb.kt                     # スキーマ定義
+│
+└── app-module/                         # アプリケーション層モジュール
+    ├── Application.kt                  # Spring Bootメインクラス
+    ├── config/                         # 設定クラス
+    ├── controller/                     # コントローラー層
+    ├── service/                        # サービス層
+    └── resources/
+        ├── application.yml             # Spring Boot設定
+        └── messages/                   # メッセージリソース
 ```
+
+### モジュール依存関係
+
+```
+app-module
+    └── persistence-module  (implementation依存)
+```
+
+- **app-module**: アプリケーション層（コントローラー、サービス、設定、Spring Boot本体）
+- **persistence-module**: データ永続化層（リポジトリ、DB設定、マイグレーション）
 
 ## データベース設計
 
@@ -92,7 +91,26 @@ companies (1) -----> (*) teams (1) -----> (*) users
 - Docker & Docker Compose
 - Gradle 8.14.3以上
 
-### 2. データベース起動
+### 2. プロジェクトクローン
+
+```bash
+# リポジトリのクローン
+git clone <repository-url>
+cd gradle-shard-module-sample
+```
+
+### 3. 初期ビルド
+
+```bash
+# プロジェクト全体のビルド
+./gradlew clean build
+
+# 各モジュールのビルド確認
+./gradlew :persistence-module:build
+./gradlew :app-module:build
+```
+
+### 4. データベース起動
 
 ```bash
 # MySQL起動
@@ -100,19 +118,178 @@ docker-compose up -d mysql
 
 # ログ確認
 docker-compose logs -f mysql
+
+# 接続確認
+docker exec mysql-db mysql -udbuser -pdbpassword -e "SELECT 1;"
 ```
 
-### 3. アプリケーション起動
+### 5. jOOQコード生成（persistence-module）
 
 ```bash
-# 開発環境で起動（マイグレーション + テストデータ投入）
-./gradlew bootRun --args='--spring.profiles.active=dev'
+# データベーススキーマからjOOQクラスを生成
+./gradlew :persistence-module:generateJooq
+
+# 生成されたクラス確認
+ls -la persistence-module/build/generated-src/jooq/main/
+```
+
+### 6. アプリケーション起動
+
+```bash
+# app-moduleから起動（開発環境：マイグレーション + テストデータ投入）
+./gradlew :app-module:bootRun --args='--spring.profiles.active=dev'
 
 # 本番環境で起動（マイグレーションのみ）
-./gradlew bootRun --args='--spring.profiles.active=prod'
+./gradlew :app-module:bootRun --args='--spring.profiles.active=prod'
 
 # デフォルト環境で起動
-./gradlew bootRun
+./gradlew :app-module:bootRun
+```
+
+### 7. 動作確認
+
+```bash
+# APIエンドポイント確認
+curl http://localhost:8080/api/companies
+
+# ヘルスチェック
+curl http://localhost:8080/actuator/health
+```
+
+## ヘルスチェック
+
+Spring Boot Actuatorによるヘルスチェックエンドポイントが利用可能です：
+
+### 基本ヘルスチェック
+```bash
+# ヘルスステータス確認
+curl http://localhost:8080/actuator/health
+
+# 詳細情報付きヘルスチェック（開発環境）
+curl http://localhost:8080/actuator/health | jq .
+```
+
+### レスポンス例
+```json
+{
+  "status": "UP",
+  "components": {
+    "db": {
+      "status": "UP",
+      "details": {
+        "database": "MySQL",
+        "validationQuery": "isValid()"
+      }
+    },
+    "diskSpace": {
+      "status": "UP",
+      "details": {
+        "total": 499963174912,
+        "free": 411612934144,
+        "threshold": 10485760,
+        "exists": true
+      }
+    },
+    "ping": {
+      "status": "UP"
+    }
+  }
+}
+```
+
+### その他のActuatorエンドポイント
+```bash
+# 利用可能なエンドポイント一覧
+curl http://localhost:8080/actuator
+
+# アプリケーション情報
+curl http://localhost:8080/actuator/info
+
+# メトリクス情報
+curl http://localhost:8080/actuator/metrics
+
+# 環境変数・設定情報（開発環境のみ）
+curl http://localhost:8080/actuator/env
+```
+
+## Swagger/OpenAPI Documentation
+
+このプロジェクトではSwagger UIによるAPI仕様の可視化をサポートしています。
+
+### Swagger UIアクセス
+
+アプリケーション起動後、以下のURLでSwagger UIにアクセスできます：
+
+```
+http://localhost:8080/swagger-ui/index.html
+```
+
+### OpenAPI仕様書
+
+OpenAPI 3.0形式のAPI仕様書は以下のエンドポイントで取得できます：
+
+```bash
+# JSON形式
+curl http://localhost:8080/v3/api-docs
+
+# YAML形式
+curl http://localhost:8080/v3/api-docs.yaml
+```
+
+### Swagger設定
+
+`application.yml`でSwaggerの設定をカスタマイズできます：
+
+```yaml
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+  packages-to-scan: com.masakaya.controller
+  paths-to-match: /api/**
+```
+
+### 環境別設定
+
+本番環境ではSwagger UIを無効化することを推奨します：
+
+```yaml
+# application-prod.yml
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+```
+
+### API仕様の自動生成
+
+コントローラーに適切なアノテーションを追加することで、Swagger仕様を充実させることができます：
+
+```kotlin
+@RestController
+@RequestMapping("/api/companies")
+@Tag(name = "Company API", description = "企業情報管理API")
+class CompanyController {
+    
+    @GetMapping
+    @Operation(
+        summary = "企業一覧取得",
+        description = "論理削除されていないアクティブな企業の一覧を取得します"
+    )
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "成功"),
+        ApiResponse(responseCode = "500", description = "サーバーエラー")
+    )
+    fun getCompanies(): List<Company> {
+        // 実装
+    }
+}
 ```
 
 ## 使い方
@@ -132,21 +309,16 @@ docker exec mysql-db mysql -udbuser -pdbpassword mydb -e "SHOW TABLES;"
 ### jOOQコード生成
 
 ```bash
-# データベースからjOOQクラスを生成
-./gradlew generateJooq
+# persistence-moduleでデータベースからjOOQクラスを生成
+./gradlew :persistence-module:generateJooq
 
 # 生成されたクラス確認
-ls -la build/generated-src/jooq/main/com/masakaya/jooq/generated/tables/
+ls -la persistence-module/build/generated-src/jooq/main/com/masakaya/jooq/generated/tables/
 ```
 
 ### テストデータ
 
 開発環境（`--spring.profiles.active=dev`）で起動すると自動でテストデータが投入されます。
-
-#### 投入されるデータ：
-- **企業**: 3社（テックイノベーション、グローバルソリューションズ、デジタルクリエイティブ）
-- **チーム**: 9チーム（各企業に3チームずつ）
-- **ユーザー**: 13名（各チームにメンバー + 論理削除済みユーザー1名）
 
 ## 環境設定
 
@@ -201,7 +373,7 @@ export DB_PASSWORD=prodpassword
 
 ### 新しいマイグレーションの追加
 
-1. `src/main/resources/db/migration/` に `V4__description.sql` を作成
+1. `persistence-module/src/main/resources/db/migration/` に `V4__description.sql` を作成
 2. べき等性を保つため `DROP TABLE IF EXISTS` を含める
 3. アプリケーション再起動で自動適用
 
@@ -218,7 +390,7 @@ CREATE TABLE departments (
 
 ### テストデータの追加
 
-1. `src/main/resources/db/seed/` に `R__description.sql` を作成
+1. `persistence-module/src/main/resources/db/seed/` に `R__description.sql` を作成
 2. `R__`プレフィックスは再実行可能（ファイル変更時に自動再実行）
 3. 必ずTRUNCATE文でデータをクリア
 
@@ -238,126 +410,30 @@ INSERT INTO departments (name) VALUES
 
 ```
 ┌─────────────────────────────┐
-│     Service Layer           │  ← ビジネスロジック
-│   service/CompanyService.kt │
-│   service/repository/       │    (リポジトリインターフェース)
-│     CompanyRepository.kt    │
+│     App Module              │
+│   ├── Controller Layer      │  ← HTTPエンドポイント
+│   │   CompanyController.kt  │
+│   └── Service Layer         │  ← ビジネスロジック
+│       CompanyService.kt     │
 ├─────────────────────────────┤
-│   Infrastructure Layer      │  ← データアクセス実装
-│ infrastructure/persistence/ │
-│  CompanyRepositoryImpl.kt   │
-│      ↓ uses jOOQ            │
-│   DSLContext + Tables       │
+│   Persistence Module        │
+│   ├── Repository Interface  │  ← リポジトリインターフェース
+│   │   CompanyRepository.kt  │
+│   └── Infrastructure Layer  │  ← データアクセス実装
+│       CompanyRepositoryImpl │
+│         ↓ uses jOOQ         │
+│       DSLContext + Tables   │
 └─────────────────────────────┘
 ```
 
 ### レイヤー別責務
 
-- **Service Layer**: ビジネスロジック、トランザクション制御、リポジトリインターフェース定義
-- **Infrastructure Layer**: jOOQを使った具体的なデータアクセス実装
-
-### コード例
-
-#### 1. Repository Interface (Service Layer)
-```kotlin
-// src/main/kotlin/com/masakaya/service/repository/CompanyRepository.kt
-interface CompanyRepository {
-    fun findAll(): List<Companies>
-    fun findById(id: Long): Companies?
-    fun findByCode(code: String): Companies?
-    fun findActiveCompanies(): List<Companies>
-    fun create(name: String, code: String, ...): Companies
-    fun update(company: Companies): Companies
-    fun softDelete(id: Long): Boolean
-}
-```
-
-#### 2. Repository Implementation (Infrastructure Layer)
-```kotlin
-// src/main/kotlin/com/masakaya/infrastructure/persistence/CompanyRepositoryImpl.kt
-@Repository
-class CompanyRepositoryImpl(private val dsl: DSLContext) : CompanyRepository {
-    
-    override fun findActiveCompanies(): List<Companies> {
-        return dsl.selectFrom(COMPANIES)
-            .where(COMPANIES.DELETED_AT.isNull)
-            .orderBy(COMPANIES.CREATED_AT.desc())
-            .fetchInto(Companies::class.java)
-    }
-    
-    override fun create(name: String, code: String, ...): Companies {
-        return dsl.insertInto(COMPANIES)
-            .set(COMPANIES.NAME, name)
-            .set(COMPANIES.CODE, code)
-            // ... 他のフィールド
-            .returning()
-            .fetchOneInto(Companies::class.java)!!
-    }
-    
-    override fun softDelete(id: Long): Boolean {
-        return dsl.update(COMPANIES)
-            .set(COMPANIES.DELETED_AT, LocalDateTime.now())
-            .where(COMPANIES.ID.eq(id))
-            .execute() > 0
-    }
-}
-```
-
-#### 3. Service (Service Layer)
-```kotlin
-// src/main/kotlin/com/masakaya/service/CompanyService.kt
-@Service
-@Transactional
-class CompanyService(private val companyRepository: CompanyRepository) {
-    
-    @Transactional(readOnly = true)
-    fun getActiveCompanies(): List<Companies> {
-        return companyRepository.findActiveCompanies()
-    }
-    
-    fun createCompany(name: String, code: String, ...): Companies {
-        // ビジネスルール: 企業コードの重複チェック
-        val existingCompany = companyRepository.findByCode(code)
-        if (existingCompany != null) {
-            throw IllegalArgumentException("企業コード '$code' は既に使用されています")
-        }
-        
-        return companyRepository.create(name, code, ...)
-    }
-}
-```
-
-## トラブルシューティング
-
-### データベース接続エラー
-```bash
-# MySQL起動確認
-docker-compose ps
-
-# MySQL再起動
-docker-compose restart mysql
-
-# ポート確認
-netstat -tlnp | grep 3306
-```
-
-### マイグレーション失敗
-```bash
-# マイグレーション履歴確認
-docker exec mysql-db mysql -udbuser -pdbpassword mydb -e "SELECT * FROM flyway_schema_history ORDER BY installed_on;"
-
-# データベースリセット（開発環境のみ）
-docker exec mysql-db mysql -uroot -prootpassword -e "DROP DATABASE mydb; CREATE DATABASE mydb;"
-```
-
-### jOOQ生成エラー
-```bash
-# データベース接続確認
-docker exec mysql-db mysql -udbuser -pdbpassword -e "SELECT 1;"
-
-# 手動生成
-./gradlew clean generateJooq
-```
+- **App Module**
+  - Controller Layer: HTTPエンドポイント、リクエスト/レスポンス処理
+  - Service Layer: ビジネスロジック、トランザクション制御
+- **Persistence Module**
+  - Repository Interface: データアクセス抽象化
+  - Infrastructure Layer: jOOQを使った具体的なデータアクセス実装
 
 ## ライセンス
 
