@@ -5,10 +5,11 @@ buildscript {
         gradlePluginPortal()
     }
     dependencies {
-        classpath(Libs.Database.mysqlConnector)
-        classpath(Libs.Database.flyway)
-        classpath(Libs.Database.flywayMysql)
         classpath("nu.studer:gradle-jooq-plugin:10.1.1")
+        // Move Flyway dependencies here for better classpath resolution
+        classpath("org.flywaydb:flyway-core:${Versions.flyway}")
+        classpath("org.flywaydb:flyway-mysql:${Versions.flyway}")
+        classpath("com.mysql:mysql-connector-j:${Versions.mysqlConnector}")
     }
 }
 
@@ -127,6 +128,32 @@ flyway {
     schemas = arrayOf("mydb")
     locations = arrayOf("filesystem:src/main/resources/db/migration")
     cleanDisabled = false
+}
+
+// Alternative Flyway migration using JavaExec 
+tasks.register<JavaExec>("runFlywayMigrate") {
+    group = "flyway"
+    description = "Run Flyway migration using JavaExec with proper classpath"
+    
+    classpath = buildscript.configurations["classpath"] + configurations.runtimeClasspath.get()
+    mainClass.set("org.flywaydb.commandline.Main")
+    
+    args(
+        "-url=$dbUrl",
+        "-user=$dbUser",
+        "-password=$dbPassword",
+        "-schemas=mydb",
+        "-locations=filesystem:src/main/resources/db/migration",
+        "migrate"
+    )
+    
+    doFirst {
+        println("=== Alternative Flyway Migration ===")
+        println("Using JavaExec with combined classpath")
+        println("URL: $dbUrl")
+        println("User: $dbUser")
+        println("Locations: src/main/resources/db/migration")
+    }
 }
 
 // Configure Flyway tasks to ensure MySQL driver is available

@@ -133,7 +133,27 @@ docker exec mysql-db mysql -udbuser -pdbpassword -e "SELECT 1;"
 ls -la persistence-module/build/generated-src/jooq/main/
 ```
 
-### 6. アプリケーション起動
+### 6. persistence-moduleのビルド（ローカル）
+
+**注意**: Flywayプラグインの制約により、ローカルでは手動でマイグレーションを実行してからビルドします。
+
+```bash
+# 手動でマイグレーション実行
+docker exec -i mysql-db mysql -uroot -prootpassword mydb < persistence-module/src/main/resources/db/migration/V1__create_companies_table.sql
+docker exec -i mysql-db mysql -uroot -prootpassword mydb < persistence-module/src/main/resources/db/migration/V2__create_teams_table.sql  
+docker exec -i mysql-db mysql -uroot -prootpassword mydb < persistence-module/src/main/resources/db/migration/V3__create_users_table.sql
+
+# jOOQクラス生成（Flywayスキップ）
+./gradlew :persistence-module:generateJooq -x flywayMigrate
+
+# persistence-moduleビルド（Flywayスキップ）
+./gradlew :persistence-module:build -x flywayMigrate
+
+# ローカルパブリッシュテスト
+./gradlew :persistence-module:publishToMavenLocal -x flywayMigrate
+```
+
+### 7. アプリケーション起動
 
 ```bash
 # app-moduleから起動（開発環境：マイグレーション + テストデータ投入）
@@ -146,7 +166,7 @@ ls -la persistence-module/build/generated-src/jooq/main/
 ./gradlew :app-module:bootRun
 ```
 
-### 7. 動作確認
+### 8. 動作確認
 
 ```bash
 # APIエンドポイント確認
