@@ -85,18 +85,13 @@ jobs:
 
     - name: Run Flyway migration with CLI
       run: |
-        flyway \
-          -url=jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC \
+        flyway migrate \
+          -url="jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC" \
           -user=dbuser \
           -password=dbpassword \
           -schemas=mydb \
-          -locations=filesystem:persistence-module/src/main/resources/db/migration \
-          -classpath=mysql-connector.jar \
-          migrate
-      env:
-        FLYWAY_URL: jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-        FLYWAY_USER: dbuser
-        FLYWAY_PASSWORD: dbpassword
+          -locations="filesystem:persistence-module/src/main/resources/db/migration" \
+          -classpath="mysql-connector.jar"
 
     - name: Build persistence module (skip Flyway)
       run: ./gradlew :persistence-module:build -x flywayMigrate
