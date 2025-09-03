@@ -6,6 +6,7 @@ buildscript {
     }
     dependencies {
         classpath(Libs.Database.mysqlConnector)
+        classpath(Libs.Database.flyway)
         classpath(Libs.Database.flywayMysql)
         classpath("nu.studer:gradle-jooq-plugin:10.1.1")
     }
