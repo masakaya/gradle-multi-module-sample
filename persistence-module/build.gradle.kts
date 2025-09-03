@@ -152,7 +152,7 @@ tasks.named("flywayMigrate") {
         println("java.class.path contains mysql: ${System.getProperty("java.class.path").contains("mysql")}")
         
         println("=== End Debug Info ===")
-
+    }
 }
 
 tasks.named("generateJooq").configure {
