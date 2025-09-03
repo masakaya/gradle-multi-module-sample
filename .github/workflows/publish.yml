@@ -75,15 +75,7 @@ jobs:
 
     - name: Run Flyway migration with Docker
       run: |
-        docker run --rm \
-          --network host \
-          -v ${{ github.workspace }}/persistence-module/src/main/resources/db/migration:/flyway/sql \
-          flyway/flyway:10.10.0 \
-          -url=jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC \
-          -user=dbuser \
-          -password=dbpassword \
-          -schemas=mydb \
-          migrate
+        docker run --rm --network host -v ${{ github.workspace }}/persistence-module/src/main/resources/db/migration:/flyway/sql flyway/flyway:10.10.0 -url=jdbc:mysql://127.0.0.1:3306/mydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC -user=dbuser -password=dbpassword -schemas=mydb migrate
 
     - name: Build persistence module (skip Flyway)
       run: ./gradlew :persistence-module:build -x flywayMigrate
