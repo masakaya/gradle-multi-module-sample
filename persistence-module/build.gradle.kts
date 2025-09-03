@@ -127,13 +127,13 @@ flyway {
 
 // Configure Flyway tasks to ensure MySQL driver is available
 tasks.named("flywayMigrate") {
-    dependsOn("classes")
     doFirst {
         println("Flyway migrate using: $dbUrl")
     }
 }
 
 tasks.named("generateJooq").configure {
+    dependsOn("flywayMigrate")
     inputs.dir("src/main/resources/db/migration")
     outputs.dir("build/generated-src/jooq")
     
@@ -141,6 +141,11 @@ tasks.named("generateJooq").configure {
         println("Generating jOOQ classes from database schema...")
         println("Make sure the database is running and migrations are applied!")
     }
+}
+
+// Ensure compileKotlin runs after jOOQ code generation
+tasks.named("compileKotlin").configure {
+    dependsOn("generateJooq")
 }
 
 // GitHub Packages publishing configuration
