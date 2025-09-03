@@ -1,16 +1,18 @@
-import org.jooq.meta.jaxb.*
 
 buildscript {
     repositories {
         mavenCentral()
+        gradlePluginPortal()
     }
     dependencies {
         classpath(Libs.Database.mysqlConnector)
         classpath(Libs.Database.flywayMysql)
+        classpath("nu.studer:gradle-jooq-plugin:10.1.1")
     }
 }
 
 plugins {
+    java
     kotlin("jvm")
     kotlin("plugin.spring")
     id("nu.studer.jooq")
@@ -65,7 +67,8 @@ jooq {
     version.set(Versions.jooq)
     
     configurations {
-        create("main") {
+        val mainConfig = create("main") as nu.studer.gradle.jooq.JooqConfig
+        mainConfig.apply {
             generateSchemaSourceOnCompilation.set(true)
             
             jooqConfiguration.apply {
@@ -95,7 +98,9 @@ jooq {
                         packageName = "com.masakaya.jooq.generated"
                         directory = "build/generated-src/jooq/main"
                     }
-                    strategy.name = "org.jooq.codegen.DefaultGeneratorStrategy"
+                    strategy.apply {
+                        name = "org.jooq.codegen.DefaultGeneratorStrategy"
+                    }
                 }
             }
         }
