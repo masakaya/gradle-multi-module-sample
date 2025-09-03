@@ -1,4 +1,4 @@
-# Gradle Shard Module Sample
+# Gradle Multi Module Sample
 
 Spring Boot + Flyway + jOOQ + MySQLを使用したサンプルプロジェクト
 
