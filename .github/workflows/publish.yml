@@ -24,10 +24,10 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h localhost"
+          --health-cmd="mysqladmin ping -h localhost -u root -prootpassword"
           --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+          --health-timeout=10s
+          --health-retries=10
 
     steps:
     - uses: actions/checkout@v4
@@ -48,11 +48,23 @@ jobs:
 
     - name: Wait for MySQL
       run: |
-        until mysqladmin ping -h"127.0.0.1" -P"3306" --silent; do
-          echo 'Waiting for MySQL...'
-          sleep 1
+        echo "Waiting for MySQL service to be ready..."
+        for i in {1..30}; do
+          if mysqladmin ping -h"127.0.0.1" -P"3306" -u"dbuser" -p"dbpassword" --silent; then
+            echo "MySQL is ready!"
+            break
+          else
+            echo "Attempt $i/30: MySQL not ready yet, waiting 5 seconds..."
+            sleep 5
+          fi
         done
-        echo "MySQL is ready!"
+        
+        # Verify connection one more time
+        echo "Final connection test..."
+        mysqladmin ping -h"127.0.0.1" -P"3306" -u"dbuser" -p"dbpassword" --silent || {
+          echo "ERROR: Could not connect to MySQL"
+          exit 1
+        }
 
     - name: Run database migrations
       run: ./gradlew :persistence-module:flywayMigrate
