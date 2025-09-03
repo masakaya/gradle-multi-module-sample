@@ -12,6 +12,7 @@ buildscript {
     }
 }
 
+
 plugins {
     java
     kotlin("jvm")
@@ -47,6 +48,11 @@ dependencies {
     // MySQL driver needs to be available at multiple classpaths for Flyway and jOOQ
     implementation(Libs.Database.mysqlConnector)
     runtimeOnly(Libs.Database.mysqlConnector)  // For Flyway runtime
+    
+    // Special Flyway classpath configuration
+    add("flywayClasspath", Libs.Database.mysqlConnector)
+    add("flywayClasspath", Libs.Database.flywayMysql)
+    
     jooqGenerator(Libs.Database.mysqlConnector)
     jooqGenerator(Libs.Jooq.codegen)
     
